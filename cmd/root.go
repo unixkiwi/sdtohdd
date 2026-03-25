@@ -17,47 +17,48 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package cmd
 
 import (
-	"os"
+	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
+var (
+	configFile string
 
-
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:   "sdtohdd",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
-}
-
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
+	rootCmd = &cobra.Command{
+		Use:   "sdtohdd",
+		Short: "sdtohdd is a small CLI tool that helps you copy files from your camera's SD card to your HDD sorted by date.",
+		Long:  "sdtohdd is a small CLI tool that helps you copy files from your camera's SD card to your HDD sorted by date.",
+		Run: func(cmd *cobra.Command, args []string) {
+			// ran when no args -> run with settings in config
+		},
 	}
+)
+
+func Execute() error {
+	return rootCmd.Execute()
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
+	cobra.OnInitialize(initConfig)
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.sdtohdd.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Config file (default is $HOME/.config/sdtohdd/config.toml)")
 }
 
+func initConfig() {
+	if configFile != "" {
+		viper.SetConfigFile(configFile)
 
+	} else {
+		viper.SetConfigName("config")
+		viper.SetConfigType("toml")
+
+		viper.AddConfigPath("$HOME/.config/sdtohdd/")
+	}
+
+	err := viper.ReadInConfig()
+	if err == nil {
+		panic(fmt.Errorf("There was an error while reading the config file: %w", err))
+	}
+}
