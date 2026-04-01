@@ -17,22 +17,18 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
-	configFile string
+	verbose bool
 
 	rootCmd = &cobra.Command{
-		Use:   "sdtohdd",
+		Use:   "sdtohdd [FLAGS] source_1 source_2 source_n destination",
 		Short: "sdtohdd is a small CLI tool that helps you copy files from your camera's SD card to your HDD sorted by date.",
 		Long:  "sdtohdd is a small CLI tool that helps you copy files from your camera's SD card to your HDD sorted by date.",
-		Run: func(cmd *cobra.Command, args []string) {
-			// ran when no args -> run with settings in config
-		},
+		Args:  cobra.MinimumNArgs(2),
+		Run:   runSdToHdd,
 	}
 )
 
@@ -41,24 +37,9 @@ func Execute() error {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
-	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Config file (default is $HOME/.config/sdtohdd/config.toml)")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Toggle verbose output")
 }
 
-func initConfig() {
-	if configFile != "" {
-		viper.SetConfigFile(configFile)
+func runSdToHdd(cmd *cobra.Command, args []string) {
 
-	} else {
-		viper.SetConfigName("config")
-		viper.SetConfigType("toml")
-
-		viper.AddConfigPath("$HOME/.config/sdtohdd/")
-	}
-
-	err := viper.ReadInConfig()
-	if err == nil {
-		panic(fmt.Errorf("There was an error while reading the config file: %w", err))
-	}
 }
