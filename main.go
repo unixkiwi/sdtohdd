@@ -16,8 +16,16 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 package main
 
-import "github.com/unixkiwi/sdtohdd/cmd"
+import (
+	"log/slog"
+	"os"
+
+	"github.com/unixkiwi/sdtohdd/cmd"
+)
 
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	slog.SetDefault(logger)
+
 	cmd.Execute()
 }
