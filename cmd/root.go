@@ -17,9 +17,11 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 package cmd
 
 import (
+	"errors"
+	"io"
 	"log/slog"
 	"os"
-	"strconv"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -27,8 +29,6 @@ import (
 
 var (
 	verbose bool
-	sources []string
-	dest    string
 
 	rootCmd = &cobra.Command{
 		Use:   "sdtohdd sourceDir1 sourceDirX destinationDir",
@@ -47,12 +47,63 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Toggle verbose output")
 }
 
-func runSdToHdd(cmd *cobra.Command, args []string) {
-	dest = args[len(args)-1]
-	sources = args[:len(args)-1]
+func moveFile(src, dst string) error {
+	// check if file exists
+	_, err := os.Stat(dst)
+	if !errors.Is(err, os.ErrNotExist) {
+		slog.Warn("File " + dst + " already exists! Skipping " + src)
+		return err
+	}
 
-	slog.Debug("Sources: " + strings.Join(sources, " "))
-	slog.Debug("Destination: " + dest)
+	stat, err := os.Stat(src)
+	if err != nil {
+		slog.Error(err.Error())
+		return err
+	}
+
+	slog.Debug("Opening file " + src)
+	inputFile, err := os.Open(src)
+	if err != nil {
+		slog.Error(err.Error())
+		return err
+	}
+	defer inputFile.Close()
+
+	slog.Debug("Creating file " + dst)
+	outputFile, err := os.Create(dst)
+	if err != nil {
+		slog.Error(err.Error())
+		return err
+	}
+	defer outputFile.Close()
+
+	slog.Debug("Copying perms " + stat.Mode().Perm().String() + " to " + dst)
+	err = os.Chmod(dst, stat.Mode().Perm())
+	if err != nil {
+		slog.Error(err.Error())
+		return err
+	}
+
+	slog.Debug("Copying file " + inputFile.Name() + " to " + outputFile.Name())
+	_, err = io.Copy(outputFile, inputFile)
+	if err != nil {
+		slog.Error(err.Error())
+		return err
+	}
+
+	// do not remove
+	// err = os.Remove(src)
+	// if err != nil {
+	// 	slog.Error(err.Error())
+	// 	return err
+	// }
+
+	return nil
+}
+
+func runSdToHdd(cmd *cobra.Command, args []string) {
+	dest := args[len(args)-1]
+	sources := args[:len(args)-1]
 
 	dstFileInfo, err := os.Stat(dest)
 	if err != nil {
@@ -63,6 +114,13 @@ func runSdToHdd(cmd *cobra.Command, args []string) {
 		slog.Error("Destination must be a directory! (" + dest + ")")
 		return
 	}
+
+	if !strings.HasSuffix(dest, "/") {
+		dest = dest + "/"
+	}
+
+	slog.Debug("Sources: " + strings.Join(sources, " "))
+	slog.Debug("Destination: " + dest)
 
 	for _, source := range sources {
 		srcFileInfo, err := os.Stat(source)
@@ -75,5 +133,28 @@ func runSdToHdd(cmd *cobra.Command, args []string) {
 			slog.Error("Source must be a directory! (" + source + ")")
 			continue
 		}
+
+		if !strings.HasSuffix(source, "/") {
+			source = source + "/"
+		}
+
+		slog.Debug("Walking Dir " + source)
+
+		filepath.WalkDir(source, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				slog.Error(err.Error())
+				return err
+			} else {
+				if !entry.IsDir() {
+					slog.Debug("Attempting to copy " + path + " to " + dest + entry.Name())
+					if err = moveFile(path, dest+entry.Name()); err != nil {
+						slog.Error("Failed to copy " + source + entry.Name() + " to " + dest + entry.Name() + "!")
+					}
+				} else {
+					slog.Info("Skipping directory " + path)
+				}
+				return nil
+			}
+		})
 	}
 }
